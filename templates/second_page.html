@@ -74,10 +74,6 @@
             </a>
         </div>
     </nav>
-    <!-- <div class="container-fluid p-3 bg-primary text-white text-center">
-        <h1>Welcome to Meeting ID : {{room_id}}</h1>
-        <p>Respect the others and kindly mute your audio if not talking!</p> 
-    </div> -->
 
     
     <div class="container mt-5 text-center" id="usernameBox">
@@ -132,22 +128,6 @@
             
 
             <hr/>
-            <!-- <div class="form-group row text-center" id="roomBox">
-                <div class="row">
-                    <div class="col-sm-6" style="border: solid 2px #000;">
-                        <div id="videoContainer" class="col-sm-6">
-                            <video id="localVideo" autoplay muted></video>
-                        </div>
-                    </div>
-                    <div class="col-sm-4" style="border: solid 2px #000;">
-                        <div id="screenShareContainer"></div>
-                    </div>
-                    <div class="col-sm-2" style="border: solid 2px #000;">
-                        <div id="messages"></div>
-                        <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-                            <button class="btn btn-danger" onclick="postMessage()">Send</button>
-                    </div>
-                </div> -->
                 <div class="form-group row text-center mb-3" id="roomBox">
                     <div class="row">
                         <div class="col-sm-6">
@@ -173,16 +153,26 @@
                 
                 <div class="form-group row text-center" style="margin-top: 4px;">
                     <div class="col-sm-2">
+                        <label class="form-label" for="languageDropdown">Choose a language:</label>
+                        <select id="transcriptionLang" class="form-control">
+                            <option value="en-US">English (US)</option>
+                            <option value="es-ES">Spanish (Spain)</option>
+                            <option value="fr-FR">French (France)</option>
+                            <option value="de-DE">German (Germany)</option>
+                            <option value="zh-CN">Chinese (Simplified)</option>
+                        </select>
                         <button onclick="startSpeechRecognition()" id="startSpeechRecognition" class="btn btn-primary">Start Transcription</button>
-                        <button onclick="stopSpeechRecognition()" id="stopSpeechRecognition"  class="btn btn-danger" style="display: none;">Stop Transcription</button>
+                        <button onclick="stopSpeechRecognition()" id="stopSpeechRecognition" class="btn btn-danger" style="display: none;">Stop Transcription</button>
                     </div>
                     <div class="col-sm-8">
                         <div id="interimTranscript" style="color: gray;"></div>
                         <div id="transcript" style="height: 100px; overflow-y: auto; margin-top: 3px;"></div>
                     </div>
                     <div class="col-sm-2">
-                        <button onclick="summarizeMeeting()" id="generate_summary" class="btn btn-primary">Summary of whole talk</button>
-                        <div id="summary"></div>
+                        <div class="col-sm-2">
+                            <button onclick="summarizeMeeting()" id="generate_summary" class="btn btn-primary " style="width: fit-content">Generate Summary</button>
+                            <div id="summary" style="margin-top: 10px;"></div> 
+                        </div>
                     </div>
                 </div>
                 
@@ -508,17 +498,7 @@ stopShareScreenBtn.addEventListener('click', async () => {
 
     // Revert to the webcam video track for each peer connection
     const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    /*for (let peerId in peers) {
-      if (peers.hasOwnProperty(peerId) && peers[peerId].stream && peers[peerId].isScreenSharing) {
-        let sender = peers[peerId].replaceTrack(
-          peers[peerId].stream.getVideoTracks()[0], // the current screen sharing track
-          newStream.getVideoTracks()[0], // the new webcam video track
-          peers[peerId].stream // the stream where the track will be replaced
-        );
-        peers[peerId].isScreenSharing = false; // Update the flag as screen sharing has stopped
-        removeScreenElementByUserId(peerId) 
-      }
-    }*/
+
     removeScreenElementByUserId(socket.id) 
 
 
@@ -666,24 +646,50 @@ socket.on('message_received', function(data) {
     scrollToBottom('messages');
 });
 
+let recognition;
+let originalTranscript = ''; // Variable to hold the original transcript for summarization
 
-var recognition;
+async function translateText(text, targetLang) {
+    try {
+        const response = await fetch('https://api-dev.on-demand.io/services/v1/public/service', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer fcXxaR1MbKwjtzxI71krWXcIjSkkQRbu', // Add your API token here
+            },
+            body: JSON.stringify({
+                source_text: text,
+                source_lang: 'en', // Assuming the transcript is in English
+                target_lang: targetLang // Target language, e.g., 'es' for Spanish
+            })
+        });
+
+        const result = await response.json();
+        return result.translated_text;  // Adjust based on the API response structure
+    } catch (error) {
+        console.error('Error while translating text:', error);
+        return text; // If translation fails, return the original text
+    }
+}
 
 function startSpeechRecognition() {
     // Check if the browser supports the Web Speech API
     if (!('webkitSpeechRecognition' in window)) {
-      alert("Your browser does not support speech recognition. Please try Google Chrome.");
-      return;
+        alert("Your browser does not support speech recognition. Please try Google Chrome.");
+        return;
     }
     
     recognition = new webkitSpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = true;  // Enable interim results
-    recognition.lang = 'en-US';
+    recognition.interimResults = true;
 
-    recognition.onresult = function(event) {
-        let finalTranscript = '';
-        let interimTranscript = '';
+    // Get the selected language from the dropdown
+    const selectedLang = document.getElementById('transcriptionLang').value;
+    recognition.lang = selectedLang;  // Set recognition language
+
+    recognition.onresult = async function(event) {
+        let finalTranscript = '';  // Holds the final recognized text
+        let interimTranscript = '';  // Holds interim recognized text
 
         // Iterate through results
         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -697,27 +703,30 @@ function startSpeechRecognition() {
         // Update the UI with interim and final results
         document.getElementById('interimTranscript').textContent = interimTranscript;
 
-        // Send final transcript to the backend for broadcasting
+        // Append final transcript to original transcript (for the full conversation)
         if (finalTranscript.trim().length > 0) {
+            originalTranscript += finalTranscript.trim() + ' ';  // Store the entire transcript
+
+            // Translate the entire transcript (so far) each time final results are received
+            const translatedText = await translateText(originalTranscript, 'es'); // Change 'es' to the target language code
+
+            // Emit the translated full transcript to the server
             socket.emit('transcript_message', {
-                username: userName,
-                transcript: finalTranscript.trim(),
-                room_id: "{{room_id}}"
+                username: userName,  // Assuming you have a variable `userName`
+                transcript: translatedText,  // Send the translated transcript
+                room_id: "{{room_id}}"  // Assuming room_id is available in your app
             });
         }
     };
 
-        // Add error handling for speech recognition
-        recognition.onerror = function(event) {
-            console.error('Speech Recognition Error:', event.error);
-            // Optionally, restart recognition here as well
-            recognition.start();
-        };
+    // Error handling for speech recognition
+    recognition.onerror = function(event) {
+        console.error('Speech Recognition Error:', event.error);
+    };
 
-    // Restart recognition when it ends
+    // Speech recognition ends
     recognition.onend = function() {
-      console.log("Speech recognition ended, restarting...");
-      recognition.start();
+        console.log("Speech recognition ended.");
     };
 
     // Start the speech recognition
@@ -739,38 +748,65 @@ function stopSpeechRecognition() {
     }
 }
 
+// Function to append transcript messages to the UI
 socket.on('broadcast_transcript', function(data) {
-    // Displaying the transcript in the 'transcript' div
-    console.log('Broadcasting', data);
-    document.getElementById('transcript').innerHTML += `<p><strong>${data.username}:</strong> ${data.transcript}</p>`;
+    const transcriptElement = document.createElement('p');
+    transcriptElement.innerHTML = `<strong>${data.username}:</strong> ${data.transcript}`;
+    document.getElementById('transcript').appendChild(transcriptElement);
     scrollToBottom('transcript');
-    if(!recognition)
-        recognition.start();
 });
 
+function scrollToBottom(id) {
+    const element = document.getElementById(id);
+    element.scrollTop = element.scrollHeight;
+}
 
-function summarizeMeeting() {
-    let transcript = document.getElementById('transcript').textContent;
+async function summarizeMeeting() {
+    // Get the transcript from the textarea
+    let transcript = document.getElementById('transcript').textContent; // Use .value instead of .textContent
     console.log(transcript);
 
+    // Show loading message while the summary is being generated
     document.getElementById('summary').innerHTML = "Result is loading ...";
 
-    fetch('/summarize', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ transcript: transcript })
-    })
-    .then(response => response.json())
-    .then(data => {
+    try {
+        // Send the transcript to the server for summarization
+        const response = await fetch('/summarize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ transcript: transcript })
+        });
+
+        // Check if the response is okay
+        if (!response.ok) {
+            const errorText = await response.text(); // Get the error text from the response
+            throw new Error('Network response was not ok: ' + errorText);
+        }
+
+        // Parse the JSON response
+        const data = await response.json(); // Wait for the JSON parsing
         console.log('Summary:', data.summary);
         document.getElementById('summary').innerHTML = data.summary;
-    })
-    .catch(error => {
-        document.getElementById('summary').innerHTML = 'Error:', error;
-    })
+
+        // Create a download link for the document
+        const documentUrl = data.document_url; // Get the document URL from the response
+        const downloadLink = document.createElement('a');
+        downloadLink.href = documentUrl; // Set the link to the document URL
+        downloadLink.download = 'meeting_summary_action_items.docx'; // Set the download filename
+        downloadLink.innerText = 'Download Summary'; // Set link text
+        downloadLink.style.display = 'block'; // Make the link a block element
+
+        // Append the download link to the summary section
+        document.getElementById('summary').appendChild(downloadLink);
+
+    } catch (error) {
+        // Display the error message if an error occurs
+        document.getElementById('summary').innerHTML = 'Error: ' + error.message;
+    }
 }
+
 
   </script>
   

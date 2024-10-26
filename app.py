@@ -9,7 +9,8 @@ import os
 from langchain import LLMChain, PromptTemplate
 from langchain.llms import DeepInfra
 from datetime import datetime
-
+import cloudinary
+from cloudinary import uploader
 
 app = Flask(__name__)
 socketio = SocketIO(app, 
@@ -19,12 +20,29 @@ socketio = SocketIO(app,
 
 rooms = {}  # For simplicity, store rooms in-memory
 
+
+
+
 load_dotenv()
 
 DEEPINFRA_API_TOKEN = os.getenv('DEEPINFRA_API_TOKEN')
 
-def save_summary_and_actions_to_doc(summary_text, action_items,new_doc_path):
-    """Save the summary text and action items to a .docx file."""
+
+cloudinary.config(
+    cloud_name='dufxa4u0f',
+    api_key='698449894236838',
+    api_secret='7K12lsmy3tAhHPMW7ab17A8Zsw8'
+)
+
+from docx import Document
+import os
+
+from docx import Document
+import io
+
+def save_summary_and_actions_to_doc(summary_text, action_items):
+    """Save the summary text and action items to a .docx file and upload to Cloudinary."""
+    # Create a Document object
     doc = Document()
     doc.add_heading('Meeting Summary', 0)
     doc.add_paragraph(summary_text)
@@ -33,17 +51,26 @@ def save_summary_and_actions_to_doc(summary_text, action_items,new_doc_path):
     for idx, item in enumerate(action_items, 1):
         doc.add_paragraph(f"{idx}. {item}")
 
-    # doc_path = 'meeting_summary_with_action_items.docx'
-    doc_path = new_doc_path
-    doc.save(doc_path)
-    return doc_path
+    # Save the document to a BytesIO object
+    doc_io = io.BytesIO()
+    doc.save(doc_io)
+    doc_io.seek(0)  # Go back to the beginning of the BytesIO object
+
+    # Create a unique public ID for the document
+    unique_id = uuid.uuid4().hex  # Generates a unique ID
+    document_name = f"meeting_summary_action_items_{unique_id}"
+
+    # Upload to Cloudinary
+    upload_result = cloudinary.uploader.upload(doc_io, resource_type='raw', public_id=document_name)
+
+    # Return the URL of the uploaded document
+    return upload_result['url']
 
 
-    
 @app.route('/summarize', methods=['POST'])
 def generate_summary_and_action_items():
     try:
-        # Get the meeting transcript from the POST request
+         #Get the meeting transcript from the POST request
         text_chunk = request.json['transcript']
 
         # Define the template for generating the summary
@@ -58,7 +85,7 @@ def generate_summary_and_action_items():
         summary_chain = LLMChain(prompt=summary_prompt, llm=DeepInfra(model_id="meta-llama/Llama-2-70b-chat-hf"))
 
         # Generate the summary
-        summary = summary_chain.invoke(text_chunk)
+        summary = summary_chain.run(text_chunk)
         if not summary:
             raise Exception("Summary generation failed")
 
@@ -74,7 +101,7 @@ def generate_summary_and_action_items():
         action_items_chain = LLMChain(prompt=action_items_prompt, llm=DeepInfra(model_id="meta-llama/Llama-2-70b-chat-hf"))
 
         # Generate the action items
-        action_items_text = action_items_chain.invoke(text_chunk)
+        action_items_text = action_items_chain.run(text_chunk)
         if not action_items_text:
             raise Exception("Action items extraction failed")
 
@@ -84,12 +111,14 @@ def generate_summary_and_action_items():
         
         randINT = uuid.uuid4().hex[:8]
         doc_name = f"summary_action_items_{randINT}.docx"
-        newPath = os.path.join('C:/Users/Dell/Desktop/repo', doc_name)
+        newPath = os.path.join('C:/Users/Dell/Desktop/Meet application/video_calling_app', doc_name)
 
         # Save the summary and action items to a .docx file
-        doc_path = save_summary_and_actions_to_doc(summary, action_items,newPath)
+        document_url = save_summary_and_actions_to_doc(summary, action_items)
 
-        return jsonify(summary=summary, action_items=action_items, document_path=doc_path)
+        # Return the document URL and summary in response
+        return jsonify(summary=summary, document_url=document_url)
+
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -204,7 +233,7 @@ def handle_new_message(data):
 @app.route('/room_join/<room_id>')
 def room_join(room_id):
     if room_id in rooms.keys():
-        return render_template('second_page.html', room_id=room_id)
+        return render_template('second_image.html', room_id=room_id)
     
     return redirect('/')
 
