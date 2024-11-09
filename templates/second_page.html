@@ -646,50 +646,214 @@ socket.on('message_received', function(data) {
     scrollToBottom('messages');
 });
 
-let recognition;
-let originalTranscript = ''; // Variable to hold the original transcript for summarization
+// let recognition;
+// let originalTranscript = ''; // Variable to hold the original transcript for summarization
 
-async function translateText(text, targetLang) {
+// async function translateText(text, targetLang) {
+//     try {
+//         const response = await fetch('https://api-dev.on-demand.io/services/v1/public/service', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'Authorization': 'Bearer fcXxaR1MbKwjtzxI71krWXcIjSkkQRbu', // Add your API token here
+//             },
+//             body: JSON.stringify({
+//                 source_text: text,
+//                 source_lang: 'en', // Assuming the transcript is in English
+//                 target_lang: targetLang // Target language, e.g., 'es' for Spanish
+//             })
+//         });
+
+//         const result = await response.json();
+//         return result.translated_text;  // Adjust based on the API response structure
+//     } catch (error) {
+//         console.error('Error while translating text:', error);
+//         return text; // If translation fails, return the original text
+//     }
+// }
+
+// function startSpeechRecognition() {
+//     // Check if the browser supports the Web Speech API
+//     if (!('webkitSpeechRecognition' in window)) {
+//         alert("Your browser does not support speech recognition. Please try Google Chrome.");
+//         return;
+//     }
+    
+//     recognition = new webkitSpeechRecognition();
+//     recognition.continuous = true;
+//     recognition.interimResults = true;
+
+//     // Get the selected language from the dropdown
+//     const selectedLang = document.getElementById('transcriptionLang').value;
+//     recognition.lang = selectedLang;  // Set recognition language
+
+//     recognition.onresult = async function(event) {
+//         let finalTranscript = '';  // Holds the final recognized text
+//         let interimTranscript = '';  // Holds interim recognized text
+
+//         // Iterate through results
+//         for (let i = event.resultIndex; i < event.results.length; ++i) {
+//             if (event.results[i].isFinal) {
+//                 finalTranscript += event.results[i][0].transcript;
+//             } else {
+//                 interimTranscript += event.results[i][0].transcript;
+//             }
+//         }
+
+//         // Update the UI with interim and final results
+//         document.getElementById('interimTranscript').textContent = interimTranscript;
+
+//         // Append final transcript to original transcript (for the full conversation)
+//         if (finalTranscript.trim().length > 0) {
+//             originalTranscript += finalTranscript.trim() + ' ';  // Store the entire transcript
+
+//             // Translate the entire transcript (so far) each time final results are received
+//             const translatedText = await translateText(originalTranscript, 'es'); // Change 'es' to the target language code
+
+//             // Emit the translated full transcript to the server
+//             socket.emit('transcript_message', {
+//                 username: userName,  // Assuming you have a variable `userName`
+//                 transcript: translatedText,  // Send the translated transcript
+//                 room_id: "{{room_id}}"  // Assuming room_id is available in your app
+//             });
+//         }
+//     };
+
+//     // Error handling for speech recognition
+//     recognition.onerror = function(event) {
+//         console.error('Speech Recognition Error:', event.error);
+//     };
+
+//     // Speech recognition ends
+//     recognition.onend = function() {
+//         console.log("Speech recognition ended.");
+//     };
+
+//     // Start the speech recognition
+//     recognition.start();
+//     console.log("Speech recognition started");
+//     document.getElementById("startSpeechRecognition").style.display = "none";
+//     document.getElementById("stopSpeechRecognition").style.display = "block";
+// }
+
+// function stopSpeechRecognition() {
+//     if (recognition) {
+//         recognition.stop();
+//         recognition.onend = null; // Remove the onend handler
+//         recognition = null;
+//         console.log("Speech recognition stopped");
+
+//         document.getElementById("startSpeechRecognition").style.display = "block";
+//         document.getElementById("stopSpeechRecognition").style.display = "none";
+//     }
+// }
+
+// // Function to append transcript messages to the UI
+// socket.on('broadcast_transcript', function(data) {
+//     const transcriptElement = document.createElement('p');
+//     transcriptElement.innerHTML = `<strong>${data.username}:</strong> ${data.transcript}`;
+//     document.getElementById('transcript').appendChild(transcriptElement);
+//     scrollToBottom('transcript');
+// });
+
+// function scrollToBottom(id) {
+//     const element = document.getElementById(id);
+//     element.scrollTop = element.scrollHeight;
+// }
+
+// async function summarizeMeeting() {
+//     // Get the transcript from the textarea
+//     let transcript = document.getElementById('transcript').textContent; // Use .value instead of .textContent
+//     console.log(transcript);
+
+//     // Show loading message while the summary is being generated
+//     document.getElementById('summary').innerHTML = "Result is loading ...";
+
+//     try {
+//         // Send the transcript to the server for summarization
+//         const response = await fetch('/summarize', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json'
+//             },
+//             body: JSON.stringify({ transcript: transcript })
+//         });
+
+//         // Check if the response is okay
+//         if (!response.ok) {
+//             const errorText = await response.text(); // Get the error text from the response
+//             throw new Error('Network response was not ok: ' + errorText);
+//         }
+
+//         // Parse the JSON response
+//         const data = await response.json(); // Wait for the JSON parsing
+//         console.log('Summary:', data.summary);
+//         document.getElementById('summary').innerHTML = data.summary;
+
+//         // Create a download link for the document
+//         const documentUrl = data.document_url; // Get the document URL from the response
+//         const downloadLink = document.createElement('a');
+//         downloadLink.href = documentUrl; // Set the link to the document URL
+//         downloadLink.download = 'meeting_summary_action_items.docx'; // Set the download filename
+//         downloadLink.innerText = 'Download Summary'; // Set link text
+//         downloadLink.style.display = 'block'; // Make the link a block element
+
+//         // Append the download link to the summary section
+//         document.getElementById('summary').appendChild(downloadLink);
+
+//     } catch (error) {
+//         // Display the error message if an error occurs
+//         document.getElementById('summary').innerHTML = 'Error: ' + error.message;
+//     }
+// }
+async function translateText(inputText, targetLang) {
+    const url = 'https://api-dev.on-demand.io/services/v1/public/service/execute/language_translation';
+
     try {
-        const response = await fetch('https://api-dev.on-demand.io/services/v1/public/service', {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer fcXxaR1MbKwjtzxI71krWXcIjSkkQRbu', // Add your API token here
+                'apikey': 'Bearer 3pgGzveFB3C545CANqPEyIapfLOeZqSl', 
             },
             body: JSON.stringify({
-                source_text: text,
-                source_lang: 'en', // Assuming the transcript is in English
-                target_lang: targetLang // Target language, e.g., 'es' for Spanish
+                input: inputText,        
+                languageCode: targetLang 
             })
         });
 
         const result = await response.json();
-        return result.translated_text;  // Adjust based on the API response structure
+
+        if (response.ok) {
+            // Return the translated text
+            return result.data.translatedText;
+        } else {
+            console.error('Error in response:', result.message);
+            return inputText; // Return the original text if translation fails
+        }
+
     } catch (error) {
         console.error('Error while translating text:', error);
-        return text; // If translation fails, return the original text
+        return inputText; // Return the original text in case of an error
     }
 }
+var recognition;
 
 function startSpeechRecognition() {
     // Check if the browser supports the Web Speech API
     if (!('webkitSpeechRecognition' in window)) {
-        alert("Your browser does not support speech recognition. Please try Google Chrome.");
-        return;
+      alert("Your browser does not support speech recognition. Please try Google Chrome.");
+      return;
     }
     
     recognition = new webkitSpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = true;  // Enable interim results
+    recognition.lang = 'en-US';
 
-    // Get the selected language from the dropdown
-    const selectedLang = document.getElementById('transcriptionLang').value;
-    recognition.lang = selectedLang;  // Set recognition language
-
-    recognition.onresult = async function(event) {
-        let finalTranscript = '';  // Holds the final recognized text
-        let interimTranscript = '';  // Holds interim recognized text
+    recognition.onresult = function(event) {
+        let finalTranscript = '';
+        let interimTranscript = '';
 
         // Iterate through results
         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -703,30 +867,27 @@ function startSpeechRecognition() {
         // Update the UI with interim and final results
         document.getElementById('interimTranscript').textContent = interimTranscript;
 
-        // Append final transcript to original transcript (for the full conversation)
+        // Send final transcript to the backend for broadcasting
         if (finalTranscript.trim().length > 0) {
-            originalTranscript += finalTranscript.trim() + ' ';  // Store the entire transcript
-
-            // Translate the entire transcript (so far) each time final results are received
-            const translatedText = await translateText(originalTranscript, 'es'); // Change 'es' to the target language code
-
-            // Emit the translated full transcript to the server
             socket.emit('transcript_message', {
-                username: userName,  // Assuming you have a variable `userName`
-                transcript: translatedText,  // Send the translated transcript
-                room_id: "{{room_id}}"  // Assuming room_id is available in your app
+                username: userName,
+                transcript: finalTranscript.trim(),
+                room_id: "{{room_id}}"
             });
         }
     };
 
-    // Error handling for speech recognition
-    recognition.onerror = function(event) {
-        console.error('Speech Recognition Error:', event.error);
-    };
+        // Add error handling for speech recognition
+        recognition.onerror = function(event) {
+            console.error('Speech Recognition Error:', event.error);
+            // Optionally, restart recognition here as well
+            recognition.start();
+        };
 
-    // Speech recognition ends
+    // Restart recognition when it ends
     recognition.onend = function() {
-        console.log("Speech recognition ended.");
+      console.log("Speech recognition ended, restarting...");
+      recognition.start();
     };
 
     // Start the speech recognition
@@ -742,71 +903,44 @@ function stopSpeechRecognition() {
         recognition.onend = null; // Remove the onend handler
         recognition = null;
         console.log("Speech recognition stopped");
-
+        translateText(transcript, "es")
+        .then(translatedText => console.log('Translated text:', translatedText))
+        .catch(error => console.error('Translation failed:', error));
         document.getElementById("startSpeechRecognition").style.display = "block";
         document.getElementById("stopSpeechRecognition").style.display = "none";
     }
 }
 
-// Function to append transcript messages to the UI
 socket.on('broadcast_transcript', function(data) {
-    const transcriptElement = document.createElement('p');
-    transcriptElement.innerHTML = `<strong>${data.username}:</strong> ${data.transcript}`;
-    document.getElementById('transcript').appendChild(transcriptElement);
+    // Displaying the transcript in the 'transcript' div
+    console.log('Broadcasting', data);
+    document.getElementById('transcript').innerHTML += `<p><strong>${data.username}:</strong> ${data.transcript}</p>`;
     scrollToBottom('transcript');
+    if(!recognition)
+        recognition.start();
 });
-
-function scrollToBottom(id) {
-    const element = document.getElementById(id);
-    element.scrollTop = element.scrollHeight;
-}
-
-async function summarizeMeeting() {
-    // Get the transcript from the textarea
-    let transcript = document.getElementById('transcript').textContent; // Use .value instead of .textContent
+function summarizeMeeting() {
+    let transcript = document.getElementById('transcript').textContent;
     console.log(transcript);
 
-    // Show loading message while the summary is being generated
     document.getElementById('summary').innerHTML = "Result is loading ...";
 
-    try {
-        // Send the transcript to the server for summarization
-        const response = await fetch('/summarize', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ transcript: transcript })
-        });
-
-        // Check if the response is okay
-        if (!response.ok) {
-            const errorText = await response.text(); // Get the error text from the response
-            throw new Error('Network response was not ok: ' + errorText);
-        }
-
-        // Parse the JSON response
-        const data = await response.json(); // Wait for the JSON parsing
+    fetch('/summarize', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ transcript: transcript })
+    })
+    .then(response => response.json())
+    .then(data => {
         console.log('Summary:', data.summary);
         document.getElementById('summary').innerHTML = data.summary;
-
-        // Create a download link for the document
-        const documentUrl = data.document_url; // Get the document URL from the response
-        const downloadLink = document.createElement('a');
-        downloadLink.href = documentUrl; // Set the link to the document URL
-        downloadLink.download = 'meeting_summary_action_items.docx'; // Set the download filename
-        downloadLink.innerText = 'Download Summary'; // Set link text
-        downloadLink.style.display = 'block'; // Make the link a block element
-
-        // Append the download link to the summary section
-        document.getElementById('summary').appendChild(downloadLink);
-
-    } catch (error) {
-        // Display the error message if an error occurs
-        document.getElementById('summary').innerHTML = 'Error: ' + error.message;
-    }
+    })
+    .catch(error => {
+        document.getElementById('summary').innerHTML = 'Error:', error;
+    })
 }
-
 
   </script>
   
